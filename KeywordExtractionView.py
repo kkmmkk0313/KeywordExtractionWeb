@@ -13,7 +13,7 @@ MIN_WORD_LENGTH = 2
 
 # Localization
 TEXTS = {
-    'title': "Keyword Explorer 🚀",
+    'title': "KYFO Keyword Explorer 🚀",
     'keyword_count_label': "Number of Keywords",
     'extract_button': "Extract Keywords",
     'reset_button': "Reset",

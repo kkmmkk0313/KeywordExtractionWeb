@@ -110,7 +110,7 @@ def main():
     setup_page_config()
     initialize_session_state()
 
-    st.image("HectoLogo.png", width=200)
+    st.logo("HectoLogo.png")
     st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([3, 2])

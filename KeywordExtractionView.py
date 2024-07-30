@@ -1,28 +1,28 @@
 import streamlit as st
 import re
-from functools import lru_cache
+from functools import lru_cache  # 함수 결과를 캐시하기 위한 데코레이터
 import random
 import time
-import colorsys
+import colorsys  # 색상 시스템 변환
 
-# Configuration
-MIN_KEYWORD_COUNT = 3
-MAX_KEYWORD_COUNT = 10
-DEFAULT_KEYWORD_COUNT = 5
-MIN_WORD_LENGTH = 2
+# 설정
+MIN_KEYWORD_COUNT = 3  # 최소 키워드 수
+MAX_KEYWORD_COUNT = 10  # 최대 키워드 수
+DEFAULT_KEYWORD_COUNT = 5  # 기본 키워드 수
+MIN_WORD_LENGTH = 2  # 최소 단어 길이
 
-# Localization
+# 지역화 (다국어 지원을 위한 텍스트 딕셔너리)
 TEXTS = {
-    'title': "KYFO Keyword Explorer 🚀",
-    'keyword_count_label': "Number of Keywords",
-    'extract_button': "Extract Keywords",
-    'reset_button': "Reset",
-    'content_title': "Original Text",
-    'keywords_title': "Extracted Keywords",
-    'error_message': "An error occurred while extracting keywords: "
+    'title': "KYFO Keyword Explorer 🚀",  # 애플리케이션 제목
+    'keyword_count_label': "Number of Keywords",  # 키워드 수 라벨
+    'extract_button': "Extract Keywords",  # 키워드 추출 버튼 텍스트
+    'reset_button': "Reset",  # 초기화 버튼 텍스트
+    'content_title': "Original Text",  # 원본 텍스트 제목
+    'keywords_title': "Extracted Keywords",  # 추출된 키워드 제목
+    'error_message': "An error occurred while extracting keywords: "  # 에러
 }
 
-# Sample text (이전과 동일)
+# 샘플 텍스트 (실제 사용시 이 부분을 사용자 입력으로 대체할 수 있음)
 DEMO_TEXT = """
 헥토헬스케어, '드시모네로 자란다, 드시모네가 잘한다' 캠페인 오픈
 
@@ -39,50 +39,53 @@ IT헬스케어기업 헥토헬스케어가 드시모네와 함께 성장하는 �
 헥토헬스케어 관계자는 "베이비, 키즈, 패밀리까지 온 가족이 장 건강과 장 면역을 챙길 수 있도록 특별한 캠페인 혜택을 마련했다"며 "프리미엄 프로바이오틱스 드시모네를 합리적인 가격에 경험할 수 있는 이번 캠페인 혜택을 놓치지 마시길 바란다"고 말했다.
 """
 
-# 전역 변수로 키워드와 점수를 정의 (이전과 동일)
+# 미리 정의된 키워드와 점수 (실제 사용시 이 부분을 키워드 추출 알고리즘으로 대체할 수 있음)
 KEYWORDS_AND_SCORES = {
-    "드시모네" : 0.9528017722366333,
-    "헥토헬스케어": 0.705151011981070042,
+    "드시모네": 0.99,
     "유산균": 0.9140244722366333,
-    "장": 0.120146906375885,
-    "안전성": 0.005151011981070042,
-    "캠페인": 0.0,
+    "헥토헬스케어": 0.84,
+    "건강": 0.520146906375885,
     "키즈": 0.307547390460968,
     "영상": 0.1891193687915802,
     "응원": 0.18563103675842285,
     "패밀리": 0.09801000356674194,
-    "건강": 0.56248614937067032,
+    "장": 0.06248614937067032,
     "오프라인": 0.07405633479356766,
-    "면역": 0.451058072596788406,
+    "면역": 0.051058072596788406,
     "자란다": 0.03860612213611603,
     "어린이": 0.03225423023104668,
     "아이": 0.030163010582327843,
-    "이벤트": 0.00464617321267724
+    "안전성": 0.005151011981070042
 }
 
 @lru_cache(maxsize=None)
 def get_keywords(_, n):
+    # 키워드를 추출하고 점수화하는 함수
     try:
+        # 키워드를 점수 기준으로 정렬하고 상위 n개를 선택
         sorted_keywords = sorted(KEYWORDS_AND_SCORES.items(), key=lambda x: x[1], reverse=True)[:n]
         max_score = max(score for _, score in sorted_keywords)
+        # 키워드, 점수, 중요도(백분율)를 반환
         return [(word, round(score, 5), min(int(score / max_score * 100), 100)) for word, score in sorted_keywords]
     except Exception as e:
         st.error(f"{TEXTS['error_message']}{str(e)}")
         return []
 
 def generate_softer_colors(n):
+    # n개의 부드러운 색상을 생성하는 함수
     hue_step = 1.0 / n
     colors = []
     for i in range(n):
         hue = i * hue_step
-        saturation = 0.3 + random.random() * 0.3  # 30-60% saturation 채도
-        value = 0.8 + random.random() * 0.2  # 80-100% value 명도
-        rgb = colorsys.hsv_to_rgb(hue, saturation, value)   # 겹치지 않게
+        saturation = 0.3 + random.random() * 0.3  # 30-60% 채도
+        value = 0.8 + random.random() * 0.2  # 80-100% 명도
+        rgb = colorsys.hsv_to_rgb(hue, saturation, value)
         colors.append(f"rgb({int(rgb[0]*255)}, {int(rgb[1]*255)}, {int(rgb[2]*255)})")
-    random.shuffle(colors)  # Shuffle to avoid predictable color order
+    random.shuffle(colors)  # 색상 순서 무작위
     return colors
 
 def create_highlighted_text(text, keywords, colors):
+    # 원본 텍스트 키워드 하이라이트
     highlighted_text = text
     for (keyword, _, _), color in zip(keywords, colors):
         pattern = re.compile(re.escape(keyword), re.IGNORECASE | re.UNICODE)
@@ -91,27 +94,31 @@ def create_highlighted_text(text, keywords, colors):
     return highlighted_text
 
 def update_state(keywords, highlighted_text):
+    # 세션 상태 업데이트
     st.session_state.keywords = keywords
     st.session_state.highlighted_text = highlighted_text
 
 def reset_state():
+    # 세션 상태 초기화
     update_state([], DEMO_TEXT)
 
 def setup_page_config():
+    # 페이지 설정
     st.set_page_config(layout="wide", page_title=TEXTS['title'], page_icon="🚀")
 
 def initialize_session_state():
+    # 세션 상태 초기화
     if 'keywords' not in st.session_state:
         st.session_state.keywords = []
     if 'highlighted_text' not in st.session_state:
         st.session_state.highlighted_text = DEMO_TEXT
 
 def main():
-    setup_page_config()
-    initialize_session_state()
+    setup_page_config()  # 페이지 설정
+    initialize_session_state()  # 세션 상태 초기화
 
-    st.logo("HectoLogo.png")
-    st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)
+    st.logo("HectoLogo.png")  # 로고
+    st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)  # 제목
 
     col1, col2 = st.columns([3, 2])
 
@@ -124,24 +131,28 @@ def main():
         keyword_count = st.slider(TEXTS['keyword_count_label'], MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, DEFAULT_KEYWORD_COUNT)
 
         col1, col2 = st.columns(2)
+        
         with col1:
+            # 키워드 추출 버튼
             if st.button(TEXTS['extract_button'], key="extract_button", use_container_width=True):
                 with st.spinner('키워드를 추출하는 중...'):
-                    time.sleep(1.2)          
+                    time.sleep(1.2)  # 로딩 효과를 위한 가라 지연        
                 keywords = get_keywords(DEMO_TEXT, keyword_count)
                 colors = generate_softer_colors(len(keywords))
                 highlighted_text = create_highlighted_text(DEMO_TEXT, keywords, colors)
                 update_state(keywords, highlighted_text)
-                st.session_state.colors = colors  # Store colors in session state
+                st.session_state.colors = colors  # 색상 정보 세션 상태에 저장
 
-                st.balloons()
-                st.experimental_rerun()
+                st.balloons()  # 추출 완료 시 풍선 효과
+                st.experimental_rerun()  # 페이지 리프레시
         
         with col2:
+            # 초기화 버튼
             if st.button(TEXTS['reset_button'], key="reset_button", use_container_width=True):
                 reset_state()
-                st.experimental_rerun()
+                st.experimental_rerun()  # 페이지 리프레시
 
+        # 추출된 키워드 표시
         if st.session_state.keywords:
             for i, ((keyword, freq, importance), color) in enumerate(zip(st.session_state.keywords, st.session_state.colors)):
                 rgb = [int(c) for c in color[4:-1].split(',')]
@@ -156,51 +167,51 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
 
-    # Custom CSS and JS
+    # CSS, JS스타일
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
 
     body {
-        font-family: 'Poppins', sans-serif;
-        background-color: #f0f2f6;
-        color: #1e1e1e;
+        font-family: 'Poppins', sans-serif;  /* 폰트 */
+        background-color: #f0f2f6;  /* 배경색 */
+        color: #1e1e1e;  /* 텍스트 색 */
     }
     .gradient-text {
-        background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4);  /* 제목에 그라데이션 */
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-weight: 600;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
     }
     .subheader {
-        color: #4a4a4a;
-        border-bottom: 2px solid #4ecdc4;
+        color: #4a4a4a;  /* 부제목 색상 설정 */
+        border-bottom: 2px solid #4ecdc4;  /* 부제목 아래 경계선 */
         padding-bottom: 0.5rem;
     }
     .text-content {
-        background-color: white;
+        background-color: white;  /* 텍스트 배경색*/
         padding: 1rem;
         border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);  /* 그림자 효과 */
         height: 60vh;
-        overflow-y: auto;
+        overflow-y: auto;  /* 세로 스크롤 허용 */
     }
     .keyword {
         padding: 2px 4px;
         border-radius: 4px;
         font-weight: bold;
-        transition: background-color 0.3s ease;
+        transition: background-color 0.3s ease;  /* 배경색 전환 효과 */
     }
     .keyword:hover {
-        filter: brightness(90%);
+        filter: brightness(90%);  /* 호버 밝기 조정 */
     }
     .keyword-item {
         display: flex;
         align-items: center;
         margin-bottom: 10px;
-        animation: slideIn 0.5s ease-out forwards;
+        animation: slideIn 0.5s ease-out forwards;  /* 슬라이드 인 애니메이션 */
         opacity: 0;
     }
     .keyword-text {
@@ -214,11 +225,11 @@ def main():
         background-color: #E7DFCF;
         border-radius: 10px;
         overflow: hidden;
-        box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.2);  /* 내부 그림자 */
     }
     .importance-fill {
         height: 100%;
-        animation: fillBar 1s ease-out;
+        animation: fillBar 1s ease-out;  /* 필바 채우기 애니메이션 */
     }
     .keyword-score {
         width: 100px;
@@ -245,19 +256,21 @@ def main():
 
     <script>
     function animateKeywords() {
+        // 키워드 항목들을 선택
         const keywords = document.querySelectorAll('.keyword-item');
+        // 각 키워드 항목에 대해 애니메이션 적용
         keywords.forEach((keyword, index) => {
             setTimeout(() => {
                 keyword.style.opacity = 1;
                 keyword.style.transform = 'translateX(0)';
-            }, index * 100);
+            }, index * 100);  // 항목마다 0.1초 간격으로 애니메이션 시작
         });
     }
 
-    // Call the animation function when the page loads
+    // 페이지 로드 완료 시 애니메이션 함수 호출
     document.addEventListener('DOMContentLoaded', animateKeywords);
     </script>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    main()  # 메인 함수 실행

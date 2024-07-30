@@ -14,7 +14,7 @@ MIN_WORD_LENGTH = 1  # 최소 단어 길이
 
 # 지역화 (다국어 지원을 위한 텍스트 딕셔너리)
 TEXTS = {
-    'title': "AX KYFO AI 🔑",  # 애플리케이션 제목
+    'title': "AX KyfoAI 🔑",  # 애플리케이션 제목
     'keyword_count_label': "추출할 키워드 수",  # 키워드 수 라벨
     'extract_button': "키워드 추출",  # 키워드 추출 버튼 텍스트
     'reset_button': "초기화",  # 초기화 버튼 텍스트

@@ -4,21 +4,22 @@ from functools import lru_cache  # 함수 결과를 캐시하기 위한 데코�
 import random
 import time
 import colorsys  # 색상 시스템 변환
+import threading
 
 # 설정
 MIN_KEYWORD_COUNT = 3  # 최소 키워드 수
 MAX_KEYWORD_COUNT = 10  # 최대 키워드 수
 DEFAULT_KEYWORD_COUNT = 5  # 기본 키워드 수
-MIN_WORD_LENGTH = 2  # 최소 단어 길이
+MIN_WORD_LENGTH = 1  # 최소 단어 길이
 
 # 지역화 (다국어 지원을 위한 텍스트 딕셔너리)
 TEXTS = {
-    'title': "KYFO Keyword Explorer 🚀",  # 애플리케이션 제목
-    'keyword_count_label': "Number of Keywords",  # 키워드 수 라벨
-    'extract_button': "Extract Keywords",  # 키워드 추출 버튼 텍스트
-    'reset_button': "Reset",  # 초기화 버튼 텍스트
-    'content_title': "Original Text",  # 원본 텍스트 제목
-    'keywords_title': "Extracted Keywords",  # 추출된 키워드 제목
+    'title': "AX KYFO AI 🔑",  # 애플리케이션 제목
+    'keyword_count_label': "추출할 키워드 수",  # 키워드 수 라벨
+    'extract_button': "키워드 추출",  # 키워드 추출 버튼 텍스트
+    'reset_button': "초기화",  # 초기화 버튼 텍스트
+    'content_title': "원문 기사",  # 원본 텍스트 제목
+    'keywords_title': "키워드",  # 추출된 키워드 제목
     'error_message': "An error occurred while extracting keywords: "  # 에러
 }
 
@@ -41,9 +42,9 @@ IT헬스케어기업 헥토헬스케어가 드시모네와 함께 성장하는 �
 
 # 미리 정의된 키워드와 점수 (실제 사용시 이 부분을 키워드 추출 알고리즘으로 대체할 수 있음)
 KEYWORDS_AND_SCORES = {
-    "드시모네": 0.99,
+    "드시모네": 0.99302,
     "유산균": 0.9140244722366333,
-    "헥토헬스케어": 0.84,
+    "헥토헬스케어": 0.84641,
     "건강": 0.520146906375885,
     "키즈": 0.307547390460968,
     "영상": 0.1891193687915802,
@@ -58,115 +59,154 @@ KEYWORDS_AND_SCORES = {
     "안전성": 0.005151011981070042
 }
 
+# 카피 딕셔너리 생성
+COPY_KEYWORDS_AND_SCORES = KEYWORDS_AND_SCORES.copy()
+def insert_new_keyword(new_word,keyword_count):
+    # 세션 상태의 custom_keywords에 새 키워드 추가
+    st.session_state.custom_keywords[new_word] = 1
+    # COPY_KEYWORDS_AND_SCORES 업데이트
+    global COPY_KEYWORDS_AND_SCORES
+    COPY_KEYWORDS_AND_SCORES = {**KEYWORDS_AND_SCORES, **st.session_state.custom_keywords}
+
+    keyword_Extract(keyword_count+1)
+    
 @lru_cache(maxsize=None)
 def get_keywords(_, n):
-    # 키워드를 추출하고 점수화하는 함수
     try:
+        all_keywords = {**KEYWORDS_AND_SCORES, **st.session_state.custom_keywords}
         # 키워드를 점수 기준으로 정렬하고 상위 n개를 선택
-        sorted_keywords = sorted(KEYWORDS_AND_SCORES.items(), key=lambda x: x[1], reverse=True)[:n]
-        max_score = max(score for _, score in sorted_keywords)
-        # 키워드, 점수, 중요도(백분율)를 반환
-        return [(word, round(score, 5), min(int(score / max_score * 100), 100)) for word, score in sorted_keywords]
+        sorted_keywords = sorted(all_keywords.items(), key=lambda x: x[1], reverse=True)[:n]
+        return [(word, round(score, 5)) for word, score in sorted_keywords]
     except Exception as e:
         st.error(f"{TEXTS['error_message']}{str(e)}")
         return []
 
 def generate_softer_colors(n):
-    # n개의 부드러운 색상을 생성하는 함수
     hue_step = 1.0 / n
     colors = []
     for i in range(n):
         hue = i * hue_step
-        saturation = 0.3 + random.random() * 0.3  # 30-60% 채도
-        value = 0.8 + random.random() * 0.2  # 80-100% 명도
+        saturation = 0.3 + random.random() * 0.3
+        value = 0.8 + random.random() * 0.2
         rgb = colorsys.hsv_to_rgb(hue, saturation, value)
         colors.append(f"rgb({int(rgb[0]*255)}, {int(rgb[1]*255)}, {int(rgb[2]*255)})")
-    random.shuffle(colors)  # 색상 순서 무작위
+    random.shuffle(colors)
     return colors
 
 def create_highlighted_text(text, keywords, colors):
-    # 원본 텍스트 키워드 하이라이트
     highlighted_text = text
-    for (keyword, _, _), color in zip(keywords, colors):
+    for (keyword, _), color in zip(keywords, colors):
         pattern = re.compile(re.escape(keyword), re.IGNORECASE | re.UNICODE)
         replacement = f'<span class="keyword" style="background-color: {color};">\g<0></span>'
         highlighted_text = pattern.sub(replacement, highlighted_text)
     return highlighted_text
 
 def update_state(keywords, highlighted_text):
-    # 세션 상태 업데이트
     st.session_state.keywords = keywords
     st.session_state.highlighted_text = highlighted_text
 
 def reset_state():
-    # 세션 상태 초기화
     update_state([], DEMO_TEXT)
 
 def setup_page_config():
-    # 페이지 설정
-    st.set_page_config(layout="wide", page_title=TEXTS['title'], page_icon="🚀")
+    st.set_page_config(layout="wide", page_title=TEXTS['title'], page_icon="🔑")
 
 def initialize_session_state():
-    # 세션 상태 초기화
     if 'keywords' not in st.session_state:
         st.session_state.keywords = []
     if 'highlighted_text' not in st.session_state:
         st.session_state.highlighted_text = DEMO_TEXT
+    if 'custom_keywords' not in st.session_state:
+        st.session_state.custom_keywords = {}    
+
+def keyword_Extract(keyword_count):
+    with st.spinner('키워드를 추출하는 중...'):
+        time.sleep(1.2)
+    keywords = get_keywords(DEMO_TEXT, keyword_count)
+    colors = generate_softer_colors(len(keywords))
+    highlighted_text = create_highlighted_text(DEMO_TEXT, keywords, colors)
+    update_state(keywords, highlighted_text)
+    st.session_state.colors = colors
+
+    st.balloons()
+    st.experimental_rerun()
+
+def show_temporary_message(message, type="success", duration=3):
+    """
+    임시 메시지를 표시하고 일정 시간 후에 제거함
+    """
+    if type == "success":
+        placeholder = st.empty()
+        placeholder.success(message)
+    elif type == "warning":
+        placeholder = st.empty()
+        placeholder.warning(message)
+    else:
+        placeholder = st.empty()
+        placeholder.info(message)
+    # 별도의 스레드에서 시간을 계산하고 메시지를 제거
+    threading.Timer(duration, placeholder.empty).start()
 
 def main():
-    setup_page_config()  # 페이지 설정
-    initialize_session_state()  # 세션 상태 초기화
+    setup_page_config()
+    initialize_session_state()
 
     st.logo("HectoLogo.png")  # 로고
-    st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)  # 제목
+    st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([3, 2])
+    col1_text, col2_keyword = st.columns([3, 2])
 
-    with col1:
+    with col1_text:
         st.markdown(f"<h3 class='subheader'>{TEXTS['content_title']}</h3>", unsafe_allow_html=True)
         st.markdown(f"<div class='text-content'>{st.session_state.highlighted_text}</div>", unsafe_allow_html=True)
 
-    with col2:
+    with col2_keyword:
         st.markdown(f"<h3 class='subheader'>{TEXTS['keywords_title']}</h3>", unsafe_allow_html=True)
         keyword_count = st.slider(TEXTS['keyword_count_label'], MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, DEFAULT_KEYWORD_COUNT)
-
-        col1, col2 = st.columns(2)
         
-        with col1:
-            # 키워드 추출 버튼
+        with st.form(key='add_keyword_form'):
+            col_input, col_button = st.columns([3, 1])
+            with col_input:
+                # 사용자 키워드 입력 필드
+                new_keyword = st.text_input("새로운 키워드를 추가할까요?", "")
+            with col_button:
+                add_keyword = st.form_submit_button("추가", use_container_width=True)  
+        
+        # 알림 메시지를 두 열 아래에 표시
+        if add_keyword:
+            if new_keyword and len(new_keyword) >= MIN_WORD_LENGTH:
+                insert_new_keyword(new_keyword,keyword_count)
+                show_temporary_message(f"성공적으로 '{new_keyword}'를 추가했습니다.", "success", 3)
+            else:
+                show_temporary_message(f"키워드는 최소 {MIN_WORD_LENGTH}자 이상이어야 합니다.", "warning", 3)
+
+        col_extract, col_reset  = st.columns(2)
+        
+        with col_extract:
             if st.button(TEXTS['extract_button'], key="extract_button", use_container_width=True):
-                with st.spinner('키워드를 추출하는 중...'):
-                    time.sleep(1.2)  # 로딩 효과를 위한 가라 지연        
-                keywords = get_keywords(DEMO_TEXT, keyword_count)
-                colors = generate_softer_colors(len(keywords))
-                highlighted_text = create_highlighted_text(DEMO_TEXT, keywords, colors)
-                update_state(keywords, highlighted_text)
-                st.session_state.colors = colors  # 색상 정보 세션 상태에 저장
-
-                st.balloons()  # 추출 완료 시 풍선 효과
-                st.experimental_rerun()  # 페이지 리프레시
+                keyword_Extract(keyword_count)
         
-        with col2:
-            # 초기화 버튼
+        with col_reset :
             if st.button(TEXTS['reset_button'], key="reset_button", use_container_width=True):
                 reset_state()
-                st.experimental_rerun()  # 페이지 리프레시
+                st.session_state.custom_keywords = {}  # 커스텀 키워드도 초기화
+                st.experimental_rerun()
 
-        # 추출된 키워드 표시
         if st.session_state.keywords:
-            for i, ((keyword, freq, importance), color) in enumerate(zip(st.session_state.keywords, st.session_state.colors)):
+            for i, ((keyword, score), color) in enumerate(zip(st.session_state.keywords, st.session_state.colors)):
                 rgb = [int(c) for c in color[4:-1].split(',')]
                 lighter_color = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.6)"
+                importance = int(score * 100)  # 점수를 퍼센트로 변환하여 중요도로 사용
                 st.markdown(f"""
                 <div class='keyword-item' style='animation-delay: {i*0.1}s;'>
                     <div class='keyword-text'>{keyword}</div>
                     <div class='importance-bar'>
                         <div class='importance-fill' style='width: {importance}%; background: linear-gradient(to right, {color}, {lighter_color});'></div>
                     </div>
-                    <div class='keyword-score'>{freq}</div>
+                    <div class='keyword-score'>{score}</div>
                 </div>
                 """, unsafe_allow_html=True)
-
+        
     # CSS, JS스타일
     st.markdown("""
     <style>
@@ -251,6 +291,10 @@ def main():
         from {
             width: 0%;
         }
+    }
+    .stButton>button {
+        height: 2.4rem;
+        margin-top: 1.55rem;
     }
     </style>
 

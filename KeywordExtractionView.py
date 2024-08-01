@@ -124,7 +124,7 @@ def keyword_Extract(keyword_count):
     update_state(keywords, highlighted_text)
     st.session_state.colors = colors
 
-    st.balloons()
+    #st.balloons()
     st.experimental_rerun()
 
 def show_temporary_message(message, type="success", duration=3):

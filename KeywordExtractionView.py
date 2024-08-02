@@ -63,8 +63,8 @@ def insert_new_keyword(new_word,keyword_count):
     # COPY_KEYWORDS_AND_SCORES 업데이트
     global COPY_KEYWORDS_AND_SCORES
     COPY_KEYWORDS_AND_SCORES = {**KEYWORDS_AND_SCORES, **st.session_state.custom_keywords}
-
-    keyword_Extract(keyword_count+1)
+    total_keywords = keyword_count + len(st.session_state.custom_keywords)
+    keyword_Extract(total_keywords)
     
 @lru_cache(maxsize=None)
 def get_keywords(_, n):
@@ -102,6 +102,7 @@ def update_state(keywords, highlighted_text):
     st.session_state.highlighted_text = highlighted_text
 
 def reset_state():
+    st.session_state.add_num = 0
     update_state([], DEMO_TEXT)
 
 def setup_page_config():
@@ -115,16 +116,15 @@ def initialize_session_state():
     if 'custom_keywords' not in st.session_state:
         st.session_state.custom_keywords = {}    
 
-def keyword_Extract(keyword_count):
+def keyword_Extract(total_keywords):
     with st.spinner('키워드를 추출하는 중...'):
         time.sleep(1.2)
-        keywords = get_keywords(DEMO_TEXT, keyword_count)
-        colors = generate_softer_colors(len(keywords))
+        keywords = get_keywords(DEMO_TEXT, total_keywords)
+        colors = generate_softer_colors(total_keywords)
         highlighted_text = create_highlighted_text(DEMO_TEXT, keywords, colors)
         update_state(keywords, highlighted_text)
         st.session_state.colors = colors
-
-    st.experimental_rerun()
+        st.rerun()
 
 def show_temporary_message(message, type="success", duration=3):
     """
@@ -143,65 +143,10 @@ def show_temporary_message(message, type="success", duration=3):
     threading.Timer(duration, placeholder.empty).start()
 
 def main():
+    st.session_state.add_num = 0 #추가된 키워드 수
     setup_page_config()
     initialize_session_state()
 
-    st.logo("HectoLogo.png")  # 로고
-    st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)
-
-    col1_text, col2_keyword = st.columns([3, 2])
-
-    with col1_text:
-        st.markdown(f"<h3 class='subheader'>{TEXTS['content_title']}</h3>", unsafe_allow_html=True)
-        st.markdown(f"<div class='text-content'>{st.session_state.highlighted_text}</div>", unsafe_allow_html=True)
-
-    with col2_keyword:
-        st.markdown(f"<h3 class='subheader'>{TEXTS['keywords_title']}</h3>", unsafe_allow_html=True)
-        keyword_count = st.slider(TEXTS['keyword_count_label'], MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, DEFAULT_KEYWORD_COUNT)
-        
-        with st.form(key='add_keyword_form'):
-            col_input, col_button = st.columns([3, 1])
-            with col_input:
-                # 사용자 키워드 입력 필드
-                new_keyword = st.text_input("새로운 키워드를 추가할까요?", "")
-            with col_button:
-                add_keyword = st.form_submit_button("추가", use_container_width=True)  
-        
-        # 알림 메시지를 두 열 아래에 표시
-        if add_keyword:
-            if new_keyword and len(new_keyword) >= MIN_WORD_LENGTH:
-                insert_new_keyword(new_keyword,keyword_count)
-                show_temporary_message(f"성공적으로 '{new_keyword}'를 추가했습니다.", "success", 3)
-            else:
-                show_temporary_message(f"키워드는 최소 {MIN_WORD_LENGTH}자 이상이어야 합니다.", "warning", 3)
-
-        col_extract, col_reset  = st.columns(2)
-        
-        with col_extract:
-            if st.button(TEXTS['extract_button'], key="extract_button", use_container_width=True):
-                keyword_Extract(keyword_count)
-        
-        with col_reset :
-            if st.button(TEXTS['reset_button'], key="reset_button", use_container_width=True):
-                reset_state()
-                st.session_state.custom_keywords = {}  # 커스텀 키워드도 초기화
-                st.experimental_rerun()
-
-        if st.session_state.keywords:
-            for i, ((keyword, score), color) in enumerate(zip(st.session_state.keywords, st.session_state.colors)):
-                rgb = [int(c) for c in color[4:-1].split(',')]
-                lighter_color = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.6)"
-                importance = int(score * 100)  # 점수를 퍼센트로 변환하여 중요도로 사용
-                st.markdown(f"""
-                <div class='keyword-item' style='animation-delay: {i*0.1}s;'>
-                    <div class='keyword-text'>{keyword}</div>
-                    <div class='importance-bar'>
-                        <div class='importance-fill' style='width: {importance}%; background: linear-gradient(to right, {color}, {lighter_color});'></div>
-                    </div>
-                    <div class='keyword-score'>{score}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
     # CSS, JS스타일
     st.markdown("""
     <style>
@@ -310,6 +255,66 @@ def main():
     document.addEventListener('DOMContentLoaded', animateKeywords);
     </script>
     """, unsafe_allow_html=True)
+    
+    st.logo("HectoLogo.png")  # 로고
+    st.markdown(f"<h1 class='gradient-text'>{TEXTS['title']}</h1>", unsafe_allow_html=True)
+
+    col1_text, col2_keyword = st.columns([3, 2])
+
+    with col1_text:
+        st.markdown(f"<h3 class='subheader'>{TEXTS['content_title']}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<div class='text-content'>{st.session_state.highlighted_text}</div>", unsafe_allow_html=True)
+
+    with col2_keyword:
+        st.markdown(f"<h3 class='subheader'>{TEXTS['keywords_title']}</h3>", unsafe_allow_html=True)
+        keyword_count = st.slider(TEXTS['keyword_count_label'], MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, DEFAULT_KEYWORD_COUNT)
+        
+        with st.form(key='add_keyword_form'):
+            col_input, col_button = st.columns([3, 1])
+            with col_input:
+                # 사용자 키워드 입력 필드
+                new_keyword = st.text_input("새로운 키워드를 추가할까요?", "")
+            with col_button:
+                add_keyword = st.form_submit_button("추가", use_container_width=True)  
+        
+        # 알림 메시지를 두 열 아래에 표시
+        if add_keyword:
+            if new_keyword and len(new_keyword) >= MIN_WORD_LENGTH:
+                st.session_state.add_num += 1
+                show_temporary_message(f"성공적으로 '{new_keyword}'를 추가했습니다.", "success", 3)
+                insert_new_keyword(new_keyword,keyword_count)
+            else:
+                show_temporary_message(f"키워드는 최소 {MIN_WORD_LENGTH}자 이상이어야 합니다.", "warning", 3)
+
+        col_extract, col_reset  = st.columns(2)
+        
+        with col_extract:
+            if st.button(TEXTS['extract_button'], key="extract_button", use_container_width=True):
+                total_keywords = keyword_count + len(st.session_state.custom_keywords)
+                keyword_Extract(total_keywords)
+        
+        with col_reset :
+            if st.button(TEXTS['reset_button'], key="reset_button", use_container_width=True):
+                reset_state()
+                st.session_state.custom_keywords = {}  # 커스텀 키워드도 초기화
+                st.experimental_rerun()
+
+        if st.session_state.keywords:
+            for i, ((keyword, score), color) in enumerate(zip(st.session_state.keywords, st.session_state.colors)):
+                rgb = [int(c) for c in color[4:-1].split(',')]
+                lighter_color = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.6)"
+                importance = int(score * 100)  # 점수를 퍼센트로 변환하여 중요도로 사용
+                st.markdown(f"""
+                <div class='keyword-item' style='animation-delay: {i*0.1}s;'>
+                    <div class='keyword-text'>{keyword}</div>
+                    <div class='importance-bar'>
+                        <div class='importance-fill' style='width: {importance}%; background: linear-gradient(to right, {color}, {lighter_color});'></div>
+                    </div>
+                    <div class='keyword-score'>{importance}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+    
 
 if __name__ == "__main__":
     main()  # 메인 함수 실행
